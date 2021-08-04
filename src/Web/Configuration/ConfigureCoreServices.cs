@@ -16,6 +16,8 @@ namespace Microsoft.eShopWeb.Web.Configuration
             services.AddScoped<IBasketService, BasketService>();
             services.AddScoped<IOrderService, OrderService>();
             services.AddScoped<IOrderRepository, OrderRepository>();
+            services.AddSingleton<IServiceBus>(new ServiceBusHandler(configuration.GetValue<string>("ServiceBusCS"), "reservationqueue"));
+            services.AddSingleton<ICosmoDbOrderSender>(new CosmoDbOrderSender(configuration.GetValue<string>("CosmoDbFncUrl")));
             services.AddSingleton<IUriComposer>(new UriComposer(configuration.Get<CatalogSettings>()));
             services.AddScoped(typeof(IAppLogger<>), typeof(LoggerAdapter<>));
             services.AddTransient<IEmailSender, EmailSender>();

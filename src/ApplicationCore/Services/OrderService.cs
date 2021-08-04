@@ -4,7 +4,11 @@ using Microsoft.eShopWeb.ApplicationCore.Entities.BasketAggregate;
 using Microsoft.eShopWeb.ApplicationCore.Entities.OrderAggregate;
 using Microsoft.eShopWeb.ApplicationCore.Interfaces;
 using Microsoft.eShopWeb.ApplicationCore.Specifications;
+using System.Configuration;
 using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Microsoft.eShopWeb.ApplicationCore.Services
@@ -15,16 +19,23 @@ namespace Microsoft.eShopWeb.ApplicationCore.Services
         private readonly IUriComposer _uriComposer;
         private readonly IAsyncRepository<Basket> _basketRepository;
         private readonly IAsyncRepository<CatalogItem> _itemRepository;
+        private readonly IServiceBus _serviceBusHandler;
+        private readonly ICosmoDbOrderSender _cosmoDbOrderSender;
+        
 
         public OrderService(IAsyncRepository<Basket> basketRepository,
             IAsyncRepository<CatalogItem> itemRepository,
             IAsyncRepository<Order> orderRepository,
-            IUriComposer uriComposer)
+            IUriComposer uriComposer,
+            IServiceBus serviceBus,
+            ICosmoDbOrderSender cosmoDbOrderSender)
         {
             _orderRepository = orderRepository;
             _uriComposer = uriComposer;
             _basketRepository = basketRepository;
             _itemRepository = itemRepository;
+            _serviceBusHandler = serviceBus;
+            _cosmoDbOrderSender = cosmoDbOrderSender;
         }
 
         public async Task CreateOrderAsync(int basketId, Address shippingAddress)
@@ -48,7 +59,16 @@ namespace Microsoft.eShopWeb.ApplicationCore.Services
 
             var order = new Order(basket.BuyerId, shippingAddress, items);
 
+            await SendOrderDetails(order);
+
             await _orderRepository.AddAsync(order);
+        }
+
+        private async Task SendOrderDetails(Order order)
+        {
+            string json = JsonSerializer.Serialize(order);
+            await _serviceBusHandler.SendAsync(json);
+            await _cosmoDbOrderSender.SendOrderDetailsToCosmoDB(order);
         }
     }
 }
